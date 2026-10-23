@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover,interactive-widget=resizes-content">
 <meta name="theme-color" content="#08080a">
 <title>PSEROS · 无声沉沦</title>
 <style>
@@ -19,7 +19,7 @@
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --ease-out: cubic-bezier(.22,.61,.36,1);
   --ease-std: cubic-bezier(.4,0,.2,1);
-  /* JS 实时写入的真实可视高度（1% 单位），兼容所有移动端浏览器 + 键盘弹起 */
+  /* 仅在软键盘弹起时由 JS 写入（1% 单位） */
   --app-h: 1vh;
   --pad-t: 56px;
   --pad-b: 48px;
@@ -48,7 +48,8 @@ body {
 
 body::after {
   content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 99;
-  background: radial-gradient(circle at 50% 40%, transparent 20%, rgba(0,0,0,0.85) 100%);
+  /* 上下对称、更轻的暗角，避免屏幕上下两端亮度不一致造成的"先后出现"错觉 */
+  background: radial-gradient(ellipse at 50% 50%, transparent 38%, rgba(0,0,0,0.6) 100%);
 }
 
 ::-webkit-scrollbar { width: 3px; }
@@ -66,18 +67,17 @@ body::after {
            calc(var(--pad-b) + env(safe-area-inset-bottom, 0px))
            calc(var(--pad-x) + env(safe-area-inset-left, 0px));
   opacity: 0; visibility: hidden;
-  transition: opacity .5s var(--ease-out), visibility 0s linear .5s;
+  transition: opacity .4s var(--ease-out), visibility 0s linear .4s;
   overflow-y: auto; overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   touch-action: pan-y;
   z-index: 1;
   height: 100vh;                            /* 兜底：不支持 dvh 的老浏览器 */
-  height: calc(var(--app-h) * 100);         /* JS 实测可视高度（含键盘弹起） */
+  height: 100dvh;                           /* 纯 CSS 计算，加载后不再二次重排 */
 }
-@supports (height: 100dvh) {
-  .page { height: calc(var(--app-h) * 100); }
-}
+/* 只有键盘弹起时才交给 JS 接管高度 */
+html.kbd .page { height: calc(var(--app-h) * 100); }
 .page.active {
   opacity: 1; visibility: visible;
   z-index: 10;
@@ -133,12 +133,13 @@ body::after {
 .card::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
 .card::after { bottom: -1px; right: -1px; border-left: 0; border-top: 0; }
 
-/* 入场：整页元素同步浮现，不再逐项错峰（消除白字与整体文字的时差） */
-.reveal {
-  opacity: 0; transform: translateY(22px);
-  transition: opacity .6s var(--ease-out), transform .6s var(--ease-out);
+/* 入场：整块内容作为一个整体同步浮现（0.35s），上下端绝对同时，不再有逐个/错峰动画 */
+.reveal { opacity: 1; transform: none; }
+.page .inner {
+  opacity: 0; transform: translateY(12px);
+  transition: opacity .35s var(--ease-out), transform .35s var(--ease-out);
 }
-.page.active .reveal { opacity: 1; transform: translateY(0); }
+.page.active .inner { opacity: 1; transform: translateY(0); }
 
 /* ========== 封面 ========== */
 #page0 {
@@ -173,11 +174,11 @@ body::after {
   display: flex; flex-direction: column; align-items: center;
   padding: calc(20px + env(safe-area-inset-top, 0px)) 16px calc(20px + env(safe-area-inset-bottom, 0px));
   opacity: 0;
-  animation: coverIn .9s var(--ease-out) .05s forwards;
+  animation: coverIn .7s var(--ease-out) forwards;   /* 整组同步，不做位移，上下端同时到位 */
 }
 @keyframes coverIn {
-  from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 #page0 h1 {
@@ -218,11 +219,12 @@ body::after {
   max-width: 320px; line-height: 2; opacity: 0.8;
   font-style: italic;
 }
+/* 呼吸提示：等封面整体入场结束后再开始，且最低亮度提高，避免"下端迟迟不出现" */
 .tap-hint {
   margin-top: 56px; font-size: 11px; letter-spacing: 0.3em; color: var(--sub);
-  animation: pulse 2.8s infinite; cursor: pointer;
+  animation: pulse 2.8s ease-in-out .8s infinite both;
 }
-@keyframes pulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+@keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
 
 /* ========== 档案 ========== */
 .row {
@@ -307,9 +309,10 @@ body::after {
   transform: translateY(16px) scale(.98);
   transition: transform .35s var(--ease-out);
   border-radius: 2px;
-  max-height: calc(var(--app-h) * 80);
+  max-height: 80vh; max-height: 80dvh;
   overflow-y: auto; -webkit-overflow-scrolling: touch;
 }
+html.kbd .modal-box { max-height: calc(var(--app-h) * 80); }
 .modal-overlay.open .modal-box { transform: translateY(0) scale(1); }
 .modal-box .m-title {
   font-family: var(--font-en); font-size: 14px; letter-spacing: 0.25em;
@@ -404,7 +407,7 @@ body::after {
 }
 .chat-messages {
   padding: 28px 22px 16px;
-  max-height: calc(var(--app-h) * 44);
+  max-height: 44vh; max-height: 44dvh;
   overflow-y: auto; -webkit-overflow-scrolling: touch;
   display: flex; flex-direction: column; gap: 18px;
   scrollbar-width: thin; scrollbar-color: var(--gold-dim) transparent;
@@ -556,10 +559,11 @@ body::after {
   .board-item .b-icon { width: 22px; font-size: 1.15rem; }
   .board-item .b-label { font-size: 0.92rem; }
 
-  .modal-box { padding: 30px 20px 24px; max-height: calc(var(--app-h) * 82); }
+  .modal-box { padding: 30px 20px 24px; max-height: 82vh; max-height: 82dvh; }
+  html.kbd .modal-box { max-height: calc(var(--app-h) * 82); }
   .modal-box .m-name { font-size: 20px; }
 
-  .chat-messages { max-height: calc(var(--app-h) * 38); padding: 20px 14px 12px; }
+  .chat-messages { max-height: 38vh; max-height: 38dvh; padding: 20px 14px 12px; }
   .chat-input-area { padding: 12px 14px calc(14px + env(safe-area-inset-bottom, 0px)); }
   .chat-send { padding: 12px 14px; font-size: 0.65rem; }
 
@@ -591,7 +595,7 @@ body::after {
   .card { padding: 16px 16px; }
   .cover-sub { margin-top: 18px; }
   .tap-hint { margin-top: 22px; }
-  .chat-messages { max-height: calc(var(--app-h) * 34); }
+  .chat-messages { max-height: 34vh; max-height: 34dvh; }
   .page-hint, .page-dots { display: none; }
 }
 
@@ -602,6 +606,7 @@ body::after {
     transition-duration: 0.01ms !important;
   }
   .reveal { opacity: 1; transform: none; }
+  .page .inner { opacity: 1; transform: none; }
   .cover-stack { opacity: 1; }
   .bg-img::after { animation: none; }
   .tap-hint { animation: none; opacity: 0.6; }
@@ -781,23 +786,23 @@ body::after {
 
 <script>
 /* =============================================
-   0. 真实可视高度（移动端地址栏 / 键盘适配）
+   0. 可视高度：只在软键盘弹起时接管
    ============================================= */
-function updateAppH() {
-  var h = window.innerHeight;
-  if (window.visualViewport && window.visualViewport.height) {
-    // 键盘弹起时 visualViewport 会变小，用它可以保证输入框不被遮住
-    h = Math.min(h, window.visualViewport.height + (window.visualViewport.offsetTop || 0));
+/* 平时完全交给 CSS 的 dvh，避免加载后二次重排 */
+function syncKeyboard() {
+  var vv = window.visualViewport;
+  if (!vv) return;
+  var keyboardOpen = (window.innerHeight - vv.height) > 120;
+  document.documentElement.classList.toggle('kbd', keyboardOpen);
+  if (keyboardOpen) {
+    document.documentElement.style.setProperty('--app-h', (vv.height / 100) + 'px');
   }
-  document.documentElement.style.setProperty('--app-h', (h / 100) + 'px');
 }
-updateAppH();
-window.addEventListener('resize', updateAppH);
-window.addEventListener('orientationchange', function () { setTimeout(updateAppH, 250); });
 if (window.visualViewport) {
-  window.visualViewport.addEventListener('resize', updateAppH);
-  window.visualViewport.addEventListener('scroll', updateAppH);
+  window.visualViewport.addEventListener('resize', syncKeyboard);
 }
+window.addEventListener('resize', syncKeyboard);
+window.addEventListener('orientationchange', function () { setTimeout(syncKeyboard, 250); });
 
 /* =============================================
    1. 翻页系统（6 页）
@@ -979,7 +984,6 @@ function addUserMessage(text) {
   chatMessages.scrollTop = chatMessages.scrollHeight;
   chatInput.value = '';
   playSound('send');
-  setTimeout(updateAppH, 60);
 }
 
 chatSend.addEventListener('click', function (e) { e.stopPropagation(); addUserMessage(chatInput.value); });
@@ -987,8 +991,13 @@ chatInput.addEventListener('keydown', function (e) {
   e.stopPropagation();
   if (e.key === 'Enter') { e.preventDefault(); addUserMessage(chatInput.value); }
 });
-chatInput.addEventListener('focus', function () { setTimeout(updateAppH, 300); });
-chatInput.addEventListener('blur', function () { setTimeout(updateAppH, 300); });
+chatInput.addEventListener('focus', function () {
+  setTimeout(syncKeyboard, 50); setTimeout(syncKeyboard, 400);
+});
+chatInput.addEventListener('blur', function () {
+  document.documentElement.classList.remove('kbd');
+  setTimeout(syncKeyboard, 150);
+});
 
 /* =============================================
    4. Web Audio 音效引擎
